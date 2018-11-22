@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.List;
  * 配置显示Item的多样化
  * <p>
  * 2018/11/14 13:40
+ * cgz@leyoujia.com
  */
 public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -28,12 +30,16 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
      * 记录每个Item的创建ViewHolder 和绑定数据实体
      */
     private LinkedList<ItemViewBinder> mBinderLinkedList = new LinkedList<>();
+
     /**
      * 数据列表
      */
-    private List mList = null;
+    private List mList;
 
     private Context mContext;
+
+    private WeakReference<LinkedList<String>> mItemWeakReference = new WeakReference<>(mLinkedList);
+    private WeakReference<LinkedList<ItemViewBinder>> mBindWeakReference = new WeakReference<>(mBinderLinkedList);
 
     public CommonListAdapter(Context mContext) {
         this.mList = new ArrayList<>();
@@ -82,12 +88,28 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
      * @param <T>
      */
     public <T> void register(@NonNull Class<? extends T> aClass, @NonNull ItemViewBinder<T, ?> viewBinder) {
-        if (!mLinkedList.contains(aClass.getName())) {
-            mLinkedList.add(aClass.getName());
+        if (null != mItemWeakReference && null != mItemWeakReference.get() &&
+                !mItemWeakReference.get().contains(aClass.getName())) {
+            mItemWeakReference.get().add(aClass.getName());
         }
-        if (!mBinderLinkedList.contains(viewBinder)) {
-            mBinderLinkedList.add(viewBinder);
+        if (null != mBindWeakReference && null != mBindWeakReference.get() &&
+                !mBindWeakReference.get().contains(viewBinder)) {
+            mBindWeakReference.get().add(viewBinder);
         }
+    }
+
+    public <T> void unRegister(@NonNull Class<? extends T> aClass) {
+        int index = -1;
+        if (null != mItemWeakReference && null != mItemWeakReference.get() &&
+                null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0 && mItemWeakReference.get().contains(aClass.getName())) {
+            index = mItemWeakReference.get().indexOf(aClass.getName());
+            mItemWeakReference.get().remove(aClass.getName());
+        }
+        if (null != mBindWeakReference && null != mBindWeakReference.get() &&
+                null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && index >= 0) {
+            mBindWeakReference.get().remove(index);
+        }
+        notifyDataSetChanged();
     }
 
     /**
@@ -97,8 +119,8 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
      * @return
      */
     private int indexOfType(Object o) {
-        if (null != mLinkedList && mLinkedList.size() > 0 && mLinkedList.contains(o.getClass().getName())) {
-            return mLinkedList.indexOf(o.getClass().getName());
+        if (null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0 && mItemWeakReference.get().contains(o.getClass().getName())) {
+            return mItemWeakReference.get().indexOf(o.getClass().getName());
         }
         return 0;
     }
@@ -204,5 +226,42 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     @NonNull
     public List<?> getmList() {
         return mList;
+    }
+
+    @NonNull
+    public <T> ItemViewBinder<T, ?> getItemViewBinder(@NonNull Class<? extends T> aClass) {
+        int key = -1;
+        if (null != mItemWeakReference && null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0 && mItemWeakReference.get().contains(aClass.getName())) {
+            key = mItemWeakReference.get().indexOf(aClass.getName());
+        }
+        if (null != mBindWeakReference && null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && key >= 0) {
+            return mBindWeakReference.get().get(key);
+        }
+        return null;
+    }
+
+    /**
+     * 释放内存
+     */
+    public void onDestroy() {
+        if (null != mBindWeakReference) {
+            if (null != mBindWeakReference.get()) {
+                mBindWeakReference.get().clear();
+            }
+            mItemWeakReference.clear();
+        }
+        if (null != mItemWeakReference) {
+            if (null != mItemWeakReference.get()) {
+                mItemWeakReference.get().clear();
+            }
+            mItemWeakReference.clear();
+        }
+        if (null != mList) {
+            mList.clear();
+            mList = null;
+        }
+        if (null != mContext) {
+            mContext = null;
+        }
     }
 }
