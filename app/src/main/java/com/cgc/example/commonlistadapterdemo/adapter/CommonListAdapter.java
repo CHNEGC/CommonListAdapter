@@ -3,14 +3,17 @@ package com.cgc.example.commonlistadapterdemo.adapter;
 import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * CHENGC
@@ -29,7 +32,8 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     /**
      * 记录每个Item的创建ViewHolder 和绑定数据实体
      */
-    private LinkedList<ItemViewBinder> mBinderLinkedList = new LinkedList<>();
+//    private LinkedList<ItemViewBinder> mBinderLinkedList = new LinkedList<>();
+    private Map<String, ItemViewBinder> mBinderLinkedList = new HashMap<>();
 
     /**
      * 数据列表
@@ -39,7 +43,7 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     private Context mContext;
 
     private WeakReference<LinkedList<String>> mItemWeakReference = new WeakReference<>(mLinkedList);
-    private WeakReference<LinkedList<ItemViewBinder>> mBindWeakReference = new WeakReference<>(mBinderLinkedList);
+    private WeakReference<Map<String, ItemViewBinder>> mBindWeakReference = new WeakReference<>(mBinderLinkedList);
 
     public CommonListAdapter(Context mContext) {
         this.mList = new ArrayList<>();
@@ -54,17 +58,27 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (null != mBinderLinkedList && mBinderLinkedList.size() > 0) {
-            View view = LayoutInflater.from(mContext).inflate(mBinderLinkedList.get(viewType).getItemViewId(), parent, false);
-            return mBinderLinkedList.get(viewType).onCreateViewHolder(view);
+        String key = "";
+        if (null != mItemWeakReference && null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0) {
+            key = mItemWeakReference.get().get(viewType);
+        }
+        if (null != mBindWeakReference && null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && !TextUtils.isEmpty(key) &&
+                mBindWeakReference.get().containsKey(key)) {
+            View view = LayoutInflater.from(mContext).inflate(mBindWeakReference.get().get(key).getItemViewId(), parent, false);
+            return mBindWeakReference.get().get(key).onCreateViewHolder(view);
         }
         return super.createViewHolder(parent, viewType);
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        if (null != mBinderLinkedList && mBinderLinkedList.size() > 0) {
-            mBinderLinkedList.get(getItemViewType(position)).onBinderViewHolder(this, holder, mList.get(position), position);
+        String key = "";
+        if (null != mItemWeakReference && null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0) {
+            key = mItemWeakReference.get().get(getItemViewType(position));
+        }
+        if (null != mBindWeakReference && null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 &&
+                !TextUtils.isEmpty(key) && mBindWeakReference.get().containsKey(key)) {
+            mBindWeakReference.get().get(key).onBinderViewHolder(this, holder, mList.get(position), position);
         }
     }
 
@@ -93,21 +107,21 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             mItemWeakReference.get().add(aClass.getName());
         }
         if (null != mBindWeakReference && null != mBindWeakReference.get() &&
-                !mBindWeakReference.get().contains(viewBinder)) {
-            mBindWeakReference.get().add(viewBinder);
+                !mBindWeakReference.get().containsKey(aClass.getName())) {
+            mBindWeakReference.get().put(aClass.getName(), viewBinder);
         }
     }
 
     public <T> void unRegister(@NonNull Class<? extends T> aClass) {
-        int index = -1;
+//        int index = -1;
         if (null != mItemWeakReference && null != mItemWeakReference.get() &&
                 null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0 && mItemWeakReference.get().contains(aClass.getName())) {
-            index = mItemWeakReference.get().indexOf(aClass.getName());
+//            index = mItemWeakReference.get().indexOf(aClass.getName());
             mItemWeakReference.get().remove(aClass.getName());
         }
-        if (null != mBindWeakReference && null != mBindWeakReference.get() &&
-                null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && index >= 0) {
-            mBindWeakReference.get().remove(index);
+        if (null != mBindWeakReference && null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && null != aClass &&
+                mBindWeakReference.get().containsKey(aClass.getName())) {
+            mBindWeakReference.get().remove(aClass.getName());
         }
         notifyDataSetChanged();
     }
@@ -119,6 +133,7 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
      * @return
      */
     private int indexOfType(Object o) {
+
         if (null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0 && mItemWeakReference.get().contains(o.getClass().getName())) {
             return mItemWeakReference.get().indexOf(o.getClass().getName());
         }
@@ -196,7 +211,10 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             notifyDataSetChanged();
         } else {
             if (null != mList && mList.size() > 0) {
-                int startIndex = this.mList.size() - 1;
+                int startIndex = 0;
+                if (null != this.mList && this.mList.size() >= 2) {
+                    startIndex = this.mList.size() - 2;
+                }
                 this.mList.addAll(mList);
                 notifyItemChanged(startIndex, this.mList.size());
             }
@@ -230,12 +248,8 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @NonNull
     public <T> ItemViewBinder<T, ?> getItemViewBinder(@NonNull Class<? extends T> aClass) {
-        int key = -1;
-        if (null != mItemWeakReference && null != mItemWeakReference.get() && mItemWeakReference.get().size() > 0 && mItemWeakReference.get().contains(aClass.getName())) {
-            key = mItemWeakReference.get().indexOf(aClass.getName());
-        }
-        if (null != mBindWeakReference && null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && key >= 0) {
-            return mBindWeakReference.get().get(key);
+        if (null != mBindWeakReference && null != mBindWeakReference.get() && mBindWeakReference.get().size() > 0 && null != aClass) {
+            return mBindWeakReference.get().get(aClass.getName());
         }
         return null;
     }
@@ -248,7 +262,7 @@ public class CommonListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             if (null != mBindWeakReference.get()) {
                 mBindWeakReference.get().clear();
             }
-            mItemWeakReference.clear();
+            mBindWeakReference.clear();
         }
         if (null != mItemWeakReference) {
             if (null != mItemWeakReference.get()) {
